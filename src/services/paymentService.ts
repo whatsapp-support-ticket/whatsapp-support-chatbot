@@ -129,3 +129,42 @@ export async function getAdminPaymentQueue() {
 
   return { payments, stats };
 }
+
+export async function updatePayment(paymentId: string, input: {
+  phoneNumber: string;
+  utrNumber?: string;
+  screenshotUrl?: string;
+}) {
+  await dbConnect();
+
+  const payment = await Payment.findById(paymentId);
+  if (!payment) {
+    throw new Error('Payment not found');
+  }
+
+  payment.phoneNumber = input.phoneNumber;
+  payment.utrNumber = input.utrNumber || undefined;
+  payment.screenshotUrl = input.screenshotUrl || undefined;
+  await payment.save();
+
+  return payment.toObject();
+}
+
+export async function deletePayment(paymentId: string) {
+  await dbConnect();
+
+  const payment = await Payment.findById(paymentId);
+  if (!payment) {
+    throw new Error('Payment not found');
+  }
+
+  if (payment.status === 'approved') {
+    throw new Error('Approved payments cannot be deleted.');
+  }
+
+  if (payment.status === 'pending') {
+    await releaseTicket(payment.ticketNumber, payment.phoneNumber);
+  }
+
+  await Payment.findByIdAndDelete(paymentId);
+}

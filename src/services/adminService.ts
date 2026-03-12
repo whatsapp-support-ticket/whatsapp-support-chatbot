@@ -45,6 +45,30 @@ export async function createDraw(input: {
   return await Draw.create(input);
 }
 
+export async function updateDraw(drawId: string, input: {
+  drawName: string;
+  drawDate: Date;
+  ticketPrice: number;
+}) {
+  await dbConnect();
+
+  return await Draw.findByIdAndUpdate(
+    drawId,
+    input,
+    { new: true }
+  ).lean();
+}
+
+export async function deleteDraw(drawId: string) {
+  await dbConnect();
+
+  await Promise.all([
+    Draw.findByIdAndDelete(drawId),
+    Ticket.deleteMany({ drawId }),
+    Setting.updateMany({ activeDrawId: drawId }, { activeDrawId: null }),
+  ]);
+}
+
 export async function listDraws() {
   await dbConnect();
 
@@ -59,6 +83,19 @@ export async function generateTicketsForDraw(input: {
   await generateTickets(input.drawId, input.prefix, input.count);
 }
 
+export async function createTicket(input: {
+  drawId: string;
+  ticketNumber: string;
+}) {
+  await dbConnect();
+
+  return await Ticket.create({
+    drawId: input.drawId,
+    ticketNumber: input.ticketNumber,
+    status: 'available',
+  });
+}
+
 export async function listTicketsForDraw(drawId?: string) {
   await dbConnect();
 
@@ -68,6 +105,48 @@ export async function listTicketsForDraw(drawId?: string) {
     .sort({ createdAt: -1, ticketNumber: 1 })
     .limit(200)
     .lean();
+}
+
+export async function updateTicket(ticketId: string, input: {
+  ticketNumber: string;
+  status: 'available' | 'reserved' | 'sold';
+}) {
+  await dbConnect();
+
+  const update: {
+    ticketNumber: string;
+    status: 'available' | 'reserved' | 'sold';
+    reservedBy?: null;
+    reservedAt?: null;
+    soldTo?: null;
+    soldAt?: null;
+  } = {
+    ticketNumber: input.ticketNumber,
+    status: input.status,
+  };
+
+  if (input.status === 'available') {
+    update.reservedBy = null;
+    update.reservedAt = null;
+    update.soldTo = null;
+    update.soldAt = null;
+  }
+
+  return await Ticket.findByIdAndUpdate(ticketId, update, { new: true }).lean();
+}
+
+export async function deleteTicket(ticketId: string) {
+  await dbConnect();
+
+  const ticket = await Ticket.findById(ticketId).lean();
+  if (!ticket) {
+    return;
+  }
+
+  await Promise.all([
+    Ticket.findByIdAndDelete(ticketId),
+    Payment.deleteMany({ ticketNumber: ticket.ticketNumber }),
+  ]);
 }
 
 export async function getAdminDashboardSnapshot() {

@@ -14,6 +14,13 @@ export async function POST(req: NextRequest) {
       mediaUrl = params.get('MediaUrl0')!;
     }
 
+    console.info('[webhook] request', {
+      from,
+      body: messageBody,
+      numMedia,
+      hasMedia: Boolean(mediaUrl),
+    });
+
     await handleWhatsAppMessage(from, messageBody, mediaUrl);
 
     return NextResponse.json({ success: true });

@@ -4,7 +4,7 @@ import User from '../models/User';
 import dbConnect from '../lib/mongodb';
 import { getPaymentSettings } from './adminService';
 import { createPaymentSubmission } from './paymentService';
-import { formatDrawDate, normalizePhoneNumber, TICKETS_PER_PAGE } from '../lib/lottery';
+import { formatDrawDate, normalizePhoneNumber, normalizeWhatsAppAddress, TICKETS_PER_PAGE } from '../lib/lottery';
 import { getAvailableTickets, getUserReservedTicket, getUserTickets, reserveTicket } from './ticketService';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -23,7 +23,16 @@ export async function handleWhatsAppMessage(from: string, body: string, mediaUrl
   await dbConnect();
 
   const phoneNumber = normalizePhoneNumber(from);
+  const replyTo = normalizeWhatsAppAddress(from);
   const input = body.trim().toUpperCase();
+  console.info('[whatsapp] inbound', {
+    from,
+    phoneNumber,
+    replyTo,
+    body,
+    input,
+    hasMedia: Boolean(mediaUrl),
+  });
 
   // Ensure user exists
   await User.findOneAndUpdate(
@@ -147,7 +156,7 @@ Complete payment using the QR code and send either:
     } = {
       body: response,
       from: fromNumber!,
-      to: from,
+      to: replyTo,
     };
 
     if (response.includes('reserved')) {
@@ -158,9 +167,30 @@ Complete payment using the QR code and send either:
       }
     }
 
-    await client.messages.create(messageData);
+    console.info('[whatsapp] outbound_attempt', {
+      from: messageData.from,
+      to: messageData.to,
+      hasMedia: Boolean(messageData.mediaUrl?.length),
+      preview: response.slice(0, 120),
+    });
+
+    const result = await client.messages.create(messageData);
+    console.info('[whatsapp] outbound_success', {
+      sid: result.sid,
+      status: result.status,
+      to: result.to,
+      from: result.from,
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+    });
   } catch (error) {
-    console.warn('Twilio client not initialized. Skipping WhatsApp response:', error);
+    console.error('[whatsapp] outbound_error', {
+      error,
+      from,
+      to: replyTo,
+      configuredFrom: fromNumber,
+      responsePreview: response.slice(0, 120),
+    });
   }
 }
 
@@ -174,9 +204,22 @@ Draw Date: ${formatDrawDate(drawDate)}
 
 Good luck!`;
 
-  await client.messages.create({
+  console.info('[whatsapp] confirmation_attempt', {
+    to: `whatsapp:${phoneNumber}`,
+    ticketNumber,
+  });
+
+  const result = await client.messages.create({
     body: message,
     from: fromNumber!,
     to: `whatsapp:${phoneNumber}`,
+  });
+
+  console.info('[whatsapp] confirmation_success', {
+    sid: result.sid,
+    status: result.status,
+    to: result.to,
+    errorCode: result.errorCode,
+    errorMessage: result.errorMessage,
   });
 }

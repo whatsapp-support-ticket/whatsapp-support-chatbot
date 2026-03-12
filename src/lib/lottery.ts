@@ -2,7 +2,16 @@ export const RESERVATION_WINDOW_MS = 5 * 60 * 1000;
 export const TICKETS_PER_PAGE = 10;
 
 export function normalizePhoneNumber(input: string): string {
-  return input.replace(/^whatsapp:/, '').trim();
+  const value = input.replace(/^whatsapp:/i, '').trim().replace(/\s+/g, '');
+  if (!value) {
+    return value;
+  }
+
+  return value.startsWith('+') ? value : `+${value}`;
+}
+
+export function normalizeWhatsAppAddress(input: string): string {
+  return `whatsapp:${normalizePhoneNumber(input)}`;
 }
 
 export function isReservationExpired(reservedAt?: Date | null): boolean {

@@ -11,6 +11,11 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
 
+export type WhatsAppReply = {
+  body: string;
+  mediaUrl?: string;
+};
+
 // Lazy initialization of Twilio client
 function getTwilioClient(): twilio.Twilio {
   if (!accountSid || !authToken) {
@@ -19,7 +24,7 @@ function getTwilioClient(): twilio.Twilio {
   return twilio(accountSid, authToken);
 }
 
-export async function handleWhatsAppMessage(from: string, body: string, mediaUrl?: string) {
+export async function handleWhatsAppMessage(from: string, body: string, mediaUrl?: string): Promise<WhatsAppReply> {
   await dbConnect();
 
   const phoneNumber = normalizePhoneNumber(from);
@@ -42,6 +47,7 @@ export async function handleWhatsAppMessage(from: string, body: string, mediaUrl
   );
 
   let response = '';
+  let responseMediaUrl: string | undefined;
 
   if (['HI', 'HELLO', 'MENU', 'START'].includes(input)) {
     response = `Welcome to Lucky Lottery
@@ -122,6 +128,10 @@ ${paymentLine}
 Complete payment using the QR code and send either:
 1. Payment screenshot
 2. UTR number`;
+        const qrCodeUrl = settings?.qrCodeUrl || process.env.QR_CODE_URL;
+        if (qrCodeUrl && !qrCodeUrl.startsWith('data:')) {
+          responseMediaUrl = qrCodeUrl;
+        }
       }
     } catch (error) {
       response = error instanceof Error ? error.message : 'Ticket could not be reserved.';
@@ -144,54 +154,16 @@ Complete payment using the QR code and send either:
       : 'Invalid input. Send MENU to see available options.';
   }
 
-  // Send response
-  try {
-    const client = getTwilioClient();
+  console.info('[whatsapp] twiml_reply', {
+    to: replyTo,
+    hasMedia: Boolean(responseMediaUrl),
+    preview: response.slice(0, 120),
+  });
 
-    const messageData: {
-      body: string;
-      from: string;
-      to: string;
-      mediaUrl?: string[];
-    } = {
-      body: response,
-      from: fromNumber!,
-      to: replyTo,
-    };
-
-    if (response.includes('reserved')) {
-      const settings = await getPaymentSettings();
-      const qrCodeUrl = settings?.qrCodeUrl || process.env.QR_CODE_URL;
-      if (qrCodeUrl && !qrCodeUrl.startsWith('data:')) {
-        messageData.mediaUrl = [qrCodeUrl];
-      }
-    }
-
-    console.info('[whatsapp] outbound_attempt', {
-      from: messageData.from,
-      to: messageData.to,
-      hasMedia: Boolean(messageData.mediaUrl?.length),
-      preview: response.slice(0, 120),
-    });
-
-    const result = await client.messages.create(messageData);
-    console.info('[whatsapp] outbound_success', {
-      sid: result.sid,
-      status: result.status,
-      to: result.to,
-      from: result.from,
-      errorCode: result.errorCode,
-      errorMessage: result.errorMessage,
-    });
-  } catch (error) {
-    console.error('[whatsapp] outbound_error', {
-      error,
-      from,
-      to: replyTo,
-      configuredFrom: fromNumber,
-      responsePreview: response.slice(0, 120),
-    });
-  }
+  return {
+    body: response,
+    mediaUrl: responseMediaUrl,
+  };
 }
 
 export async function sendConfirmation(phoneNumber: string, ticketNumber: string, drawDate: Date) {

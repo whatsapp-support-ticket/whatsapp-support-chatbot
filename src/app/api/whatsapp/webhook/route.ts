@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import twilio from 'twilio';
 import { handleWhatsAppMessage } from '@/services/whatsappService';
 
 export async function POST(req: NextRequest) {
@@ -21,11 +22,34 @@ export async function POST(req: NextRequest) {
       hasMedia: Boolean(mediaUrl),
     });
 
-    await handleWhatsAppMessage(from, messageBody, mediaUrl);
+    const reply = await handleWhatsAppMessage(from, messageBody, mediaUrl);
+    const twiml = new twilio.twiml.MessagingResponse();
+    const message = twiml.message(reply.body);
 
-    return NextResponse.json({ success: true });
+    if (reply.mediaUrl && !reply.mediaUrl.startsWith('data:')) {
+      message.media(reply.mediaUrl);
+    }
+
+    console.info('[webhook] twiml_response', {
+      to: from,
+      hasMedia: Boolean(reply.mediaUrl && !reply.mediaUrl.startsWith('data:')),
+      preview: reply.body.slice(0, 120),
+    });
+
+    return new Response(twiml.toString(), {
+      headers: {
+        'Content-Type': 'text/xml',
+      },
+    });
   } catch (error) {
     console.error('Webhook error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const twiml = new twilio.twiml.MessagingResponse();
+    twiml.message('Something went wrong. Please try again in a moment.');
+    return new Response(twiml.toString(), {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/xml',
+      },
+    });
   }
 }

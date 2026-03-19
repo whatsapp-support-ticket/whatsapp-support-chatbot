@@ -10,7 +10,6 @@ export async function GET() {
     // Create a draw
     const draw = new Draw({
       drawName: 'Weekly Lottery',
-      drawDate: new Date('2026-03-15T20:00:00Z'),
       ticketPrice: 50,
     });
     await draw.save();

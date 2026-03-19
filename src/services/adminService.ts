@@ -31,23 +31,33 @@ export async function upsertPaymentSettings(input: {
   return await Setting.findOneAndUpdate(
     { key: PAYMENT_SETTINGS_KEY },
     update,
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   ).lean();
 }
 
 export async function createDraw(input: {
   drawName: string;
-  drawDate: Date;
   ticketPrice: number;
 }) {
   await dbConnect();
 
-  return await Draw.create(input);
+  const draw = await Draw.create(input);
+
+  await Setting.findOneAndUpdate(
+    { key: PAYMENT_SETTINGS_KEY },
+    {
+      key: PAYMENT_SETTINGS_KEY,
+      activeDrawId: draw._id,
+      updatedAt: new Date(),
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
+
+  return draw;
 }
 
 export async function updateDraw(drawId: string, input: {
   drawName: string;
-  drawDate: Date;
   ticketPrice: number;
 }) {
   await dbConnect();
@@ -55,7 +65,7 @@ export async function updateDraw(drawId: string, input: {
   return await Draw.findByIdAndUpdate(
     drawId,
     input,
-    { new: true }
+    { returnDocument: 'after' }
   ).lean();
 }
 
@@ -72,7 +82,7 @@ export async function deleteDraw(drawId: string) {
 export async function listDraws() {
   await dbConnect();
 
-  return await Draw.find({}).sort({ drawDate: 1 }).lean();
+  return await Draw.find({}).sort({ createdAt: -1 }).lean();
 }
 
 export async function generateTicketsForDraw(input: {
@@ -132,7 +142,7 @@ export async function updateTicket(ticketId: string, input: {
     update.soldAt = null;
   }
 
-  return await Ticket.findByIdAndUpdate(ticketId, update, { new: true }).lean();
+  return await Ticket.findByIdAndUpdate(ticketId, update, { returnDocument: 'after' }).lean();
 }
 
 export async function deleteTicket(ticketId: string) {
@@ -153,7 +163,7 @@ export async function getAdminDashboardSnapshot() {
   await dbConnect();
 
   const [draws, tickets, settings, payments, ticketSummary] = await Promise.all([
-    Draw.find({}).sort({ drawDate: 1 }).lean(),
+    Draw.find({}).sort({ createdAt: -1 }).lean(),
     Ticket.find({}).sort({ createdAt: -1 }).limit(200).lean(),
     getPaymentSettings(),
     Payment.find({}).sort({ createdAt: -1 }).limit(50).lean(),

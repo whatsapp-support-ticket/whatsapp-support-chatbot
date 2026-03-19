@@ -44,6 +44,20 @@ export async function reserveTicket(ticketNumber: string, phoneNumber: string) {
     throw new Error(`You already have ticket ${activeReservation.ticketNumber} reserved. Complete payment or wait for it to expire.`);
   }
 
+  const matchingTickets = await Ticket.find({
+    ticketNumber,
+    $or: [
+      { status: 'available' },
+      { status: 'reserved', reservedBy: phoneNumber },
+    ],
+  })
+    .select({ _id: 1 })
+    .lean();
+
+  if (matchingTickets.length > 1) {
+    throw new Error('This ticket number exists in multiple draws. Use unique ticket numbers across draws to support all-draw booking.');
+  }
+
   const ticket = await Ticket.findOneAndUpdate(
     {
       ticketNumber,
@@ -53,7 +67,7 @@ export async function reserveTicket(ticketNumber: string, phoneNumber: string) {
       ],
     },
     { status: 'reserved', reservedBy: phoneNumber, reservedAt: new Date() },
-    { new: true }
+    { returnDocument: 'after' }
   );
   return ticket;
 }
@@ -78,7 +92,7 @@ export async function sellTicket(ticketNumber: string, phoneNumber: string) {
       reservedBy: null,
       reservedAt: null,
     },
-    { new: true }
+    { returnDocument: 'after' }
   );
 }
 
@@ -91,7 +105,7 @@ export async function releaseTicket(ticketNumber: string, phoneNumber?: string) 
   return await Ticket.findOneAndUpdate(
     filter,
     { status: 'available', reservedBy: null, reservedAt: null },
-    { new: true }
+    { returnDocument: 'after' }
   );
 }
 
@@ -124,7 +138,7 @@ export async function generateTickets(drawId: string, prefix: string, count: num
   await dbConnect();
   const tickets = [];
   for (let i = 1; i <= count; i++) {
-    const ticketNumber = `${prefix}${i.toString().padStart(3, '0')}`;
+    const ticketNumber = `${prefix}${i.toString().padStart(6, '0')}`;
     tickets.push({
       ticketNumber,
       drawId,

@@ -10,11 +10,10 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   try {
     assertAdminRequest(req);
     const { drawId } = await context.params;
-    const { drawName, drawDate, ticketPrice } = await req.json();
+    const { drawName, ticketPrice } = await req.json();
 
     const draw = await updateDraw(drawId, {
       drawName,
-      drawDate: new Date(drawDate),
       ticketPrice: Number(ticketPrice),
     });
 

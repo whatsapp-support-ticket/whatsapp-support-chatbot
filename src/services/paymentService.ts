@@ -61,7 +61,7 @@ export async function approvePayment(paymentId: string) {
 
   const draw = await Draw.findById(soldTicket.drawId);
   if (draw) {
-    await sendConfirmation(payment.phoneNumber, payment.ticketNumber, draw.drawDate);
+    await sendConfirmation(payment.phoneNumber, payment.ticketNumber, draw.drawDate ?? undefined);
   }
 
   await Payment.updateMany(

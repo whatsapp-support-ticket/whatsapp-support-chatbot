@@ -17,15 +17,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     assertAdminRequest(req);
-    const { drawName, drawDate, ticketPrice } = await req.json();
+    const { drawName, ticketPrice } = await req.json();
 
-    if (!drawName || !drawDate || !ticketPrice) {
-      return NextResponse.json({ error: 'drawName, drawDate and ticketPrice are required' }, { status: 400 });
+    if (!drawName || !ticketPrice) {
+      return NextResponse.json({ error: 'drawName and ticketPrice are required' }, { status: 400 });
     }
 
     const draw = await createDraw({
       drawName,
-      drawDate: new Date(drawDate),
       ticketPrice: Number(ticketPrice),
     });
 

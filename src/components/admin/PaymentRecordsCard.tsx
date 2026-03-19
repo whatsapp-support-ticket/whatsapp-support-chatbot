@@ -125,15 +125,13 @@ export default function PaymentRecordsCard({
               >
                 Edit
               </button>
-              {payment.status !== 'approved' ? (
-                <button
-                  type="button"
-                  className="rounded-lg bg-red-600 px-3 py-1 text-white"
-                  onClick={() => onDelete(payment._id)}
-                >
-                  Delete
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="rounded-lg bg-red-600 px-3 py-1 text-white"
+                onClick={() => onDelete(payment._id)}
+              >
+                Delete
+              </button>
             </div>
           </div>
         ))}

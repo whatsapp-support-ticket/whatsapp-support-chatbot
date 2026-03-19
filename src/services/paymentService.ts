@@ -158,10 +158,6 @@ export async function deletePayment(paymentId: string) {
     throw new Error('Payment not found');
   }
 
-  if (payment.status === 'approved') {
-    throw new Error('Approved payments cannot be deleted.');
-  }
-
   if (payment.status === 'pending') {
     await releaseTicket(payment.ticketNumber, payment.phoneNumber);
   }
